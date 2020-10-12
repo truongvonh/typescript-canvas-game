@@ -93,6 +93,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _models_Player__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(1);
 /* harmony import */ var _models_Projectile__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(3);
 /* harmony import */ var _models_Enimes__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(4);
+/* harmony import */ var _models_Particle__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(5);
+/* harmony import */ var _enum_game__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(6);
+
+
 
 
 
@@ -104,23 +108,63 @@ function () {
     var _this = this;
 
     this.projectiles = [];
+    this.particles = [];
     this.enemies = [];
+    this.isPlayGame = true;
 
     this.animate = function () {
-      requestAnimationFrame(_this.animate); // todo: After projectile was fire. We will clear canvas and re-draw player
+      if (_this.isPlayGame) requestAnimationFrame(_this.animate); // todo: After projectile was fire. We will clear canvas and re-draw player
 
-      _this.ctx.clearRect(0, 0, _this.canvas.width, _this.canvas.height);
+      _this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
 
-      _this.mainPlayer.draw(_this.ctx); // todo: Render projectiles
+      _this.ctx.fillRect(0, 0, _this.canvas.width, _this.canvas.height);
+
+      _this.mainPlayer.draw(_this.ctx);
+
+      _this.particles.forEach(function (particle, paIndex) {
+        if (particle.alpha < 0) _this.removeItemInArray(_this.particles, paIndex);
+        particle.update(_this.ctx);
+      });
+      /* Render projectiles
+       * Check projectiles outside screen and remove it
+       */
 
 
-      _this.projectiles.forEach(function (projectile) {
-        return projectile.update(_this.ctx);
-      }); // todo: Render Enemies
+      _this.projectiles.forEach(function (projectile, pIndex) {
+        projectile.update(_this.ctx);
 
+        _this.removeProjectilesOutScreen(projectile, pIndex);
+      });
 
-      _this.enemies.forEach(function (enemy) {
-        return enemy.update(_this.ctx);
+      _this.enemies.forEach(function (enemy, eIndex) {
+        enemy.update(_this.ctx); // @ts-ignore
+
+        var distancePlayer = Math.hypot(enemy.x - _this.mainPlayer.x, enemy.y - _this.mainPlayer.y);
+        var isGameOver = distancePlayer - enemy.radius - _this.mainPlayer.radius < 1;
+        if (isGameOver) _this.isPlayGame = false;
+
+        _this.projectiles.forEach(function (projectile, pIndex) {
+          // @ts-ignore
+          var distanceEnemy = Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y);
+          var isContactEnemy = distanceEnemy - projectile.radius - enemy.radius < 1;
+
+          if (isContactEnemy) {
+            _this.renderParticles(projectile, enemy);
+
+            if (enemy.radius - _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].MIN_RADIUS > _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].MIN_RADIUS) {
+              enemy.radius -= _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].MIN_RADIUS;
+              setTimeout(function () {
+                return _this.removeItemInArray(_this.projectiles, pIndex);
+              }, 0);
+            } else {
+              setTimeout(function () {
+                _this.removeItemInArray(_this.enemies, eIndex);
+
+                _this.removeItemInArray(_this.projectiles, pIndex);
+              }, 0);
+            }
+          }
+        });
       });
     };
 
@@ -130,25 +174,48 @@ function () {
     this.spawnEnemies();
   }
 
+  CanvasGame.prototype.removeItemInArray = function (array, indexRemove) {
+    return array.splice(indexRemove, 1);
+  };
+
+  CanvasGame.prototype.generateEnemies = function () {
+    var radius = Math.random() * (_enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].MAX_RADIUS - _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].MIN_RADIUS) + _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].MIN_RADIUS;
+    var x = 0;
+    var y = 0;
+
+    if (Math.random() < _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].HAFT_PAST) {
+      x = Math.random() < _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].HAFT_PAST ? 0 - radius : this.canvas.width + radius;
+      y = Math.random() * this.canvas.height;
+    } else {
+      x = Math.random() * this.canvas.width;
+      y = Math.random() < _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].HAFT_PAST ? 0 - radius : this.canvas.height + radius;
+    }
+
+    var angle = Math.atan2(this.canvasCenterY - y, this.canvasCenterX - x);
+    var velocity = {
+      x: Math.cos(angle),
+      y: Math.sin(angle)
+    };
+    var randomColor = "hsl(" + Math.random() * 360 + ", 100%, 50%)";
+    this.enemies.push(new _models_Enimes__WEBPACK_IMPORTED_MODULE_2__["default"](x, y, randomColor, radius, velocity));
+  };
+
   CanvasGame.prototype.spawnEnemies = function () {
     var _this = this;
 
     setInterval(function () {
-      _this.enemies.push(new _models_Enimes__WEBPACK_IMPORTED_MODULE_2__["default"](1, 1, 'green', 10, {
-        x: 1,
-        y: 1
-      }));
+      _this.generateEnemies();
     }, 1000);
   };
 
   CanvasGame.prototype.init = function () {
-    this.canvas = document.querySelector("#canvas-game");
-    this.ctx = this.canvas.getContext("2d");
+    this.canvas = document.querySelector('#canvas-game');
+    this.ctx = this.canvas.getContext('2d');
     this.canvas.width = innerWidth;
     this.canvas.height = innerHeight;
     this.canvasCenterX = this.canvas.width / 2;
     this.canvasCenterY = this.canvas.height / 2;
-    this.mainPlayer = new _models_Player__WEBPACK_IMPORTED_MODULE_0__["default"](this.canvasCenterX, this.canvasCenterY, "blue", 30);
+    this.mainPlayer = new _models_Player__WEBPACK_IMPORTED_MODULE_0__["default"](this.canvasCenterX, this.canvasCenterY, 'blue', 30);
     this.mainPlayer.draw(this.ctx);
   };
 
@@ -160,14 +227,34 @@ function () {
           clientY = e.clientY;
       var angle = Math.atan2(clientY - _this.canvasCenterY, clientX - _this.canvasCenterX);
       var velocity = {
-        x: Math.cos(angle),
-        y: Math.sin(angle)
+        x: Math.cos(angle) * 4,
+        y: Math.sin(angle) * 4
       };
 
       _this.projectiles.push(new _models_Projectile__WEBPACK_IMPORTED_MODULE_1__["default"](_this.canvasCenterX, _this.canvasCenterY, 'red', 5, velocity));
     });
   };
 
+  CanvasGame.prototype.removeProjectilesOutScreen = function (projectile, pIndex) {
+    var _this = this;
+
+    var isOutScreen = projectile.x - projectile.radius < 0 || projectile.x + projectile.radius > this.canvas.width || projectile.y - projectile.radius < 0 || projectile.y + projectile.radius > this.canvas.height;
+    if (isOutScreen) setTimeout(function () {
+      return _this.projectiles.splice(pIndex, 1);
+    }, 0);
+  };
+
+  CanvasGame.prototype.renderParticles = function (projectile, enemy) {
+    for (var i = 0; i < CanvasGame.particleNumber; i++) {
+      var velocity = {
+        x: Math.random() - _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].HAFT_PAST,
+        y: Math.random() - _enum_game__WEBPACK_IMPORTED_MODULE_4__["GAME_ENUM"].HAFT_PAST
+      };
+      this.particles.push(new _models_Particle__WEBPACK_IMPORTED_MODULE_3__["default"](projectile.x, projectile.y, enemy.color, 3, velocity));
+    }
+  };
+
+  CanvasGame.particleNumber = 8;
   return CanvasGame;
 }();
 
@@ -350,6 +437,86 @@ function (_super) {
 }(_Projectile__WEBPACK_IMPORTED_MODULE_0__["default"]);
 
 /* harmony default export */ __webpack_exports__["default"] = (Enemy);
+
+/***/ }),
+/* 5 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _Projectile__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3);
+var __extends = undefined && undefined.__extends || function () {
+  var extendStatics = function (d, b) {
+    extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+
+    return extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+
+
+var Particle =
+/** @class */
+function (_super) {
+  __extends(Particle, _super);
+
+  function Particle() {
+    var _this = _super !== null && _super.apply(this, arguments) || this;
+
+    _this.alpha = 1;
+    return _this;
+  }
+
+  Particle.prototype.update = function (ctx) {
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+
+    _super.prototype.update.call(this, ctx);
+
+    ctx.restore();
+  };
+
+  Particle.prototype.draw = function (ctx) {
+    _super.prototype.draw.call(this, ctx);
+
+    this.alpha -= 0.01;
+  };
+
+  return Particle;
+}(_Projectile__WEBPACK_IMPORTED_MODULE_0__["default"]);
+
+/* harmony default export */ __webpack_exports__["default"] = (Particle);
+
+/***/ }),
+/* 6 */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "GAME_ENUM", function() { return GAME_ENUM; });
+var GAME_ENUM;
+
+(function (GAME_ENUM) {
+  GAME_ENUM[GAME_ENUM["HAFT_PAST"] = 0.5] = "HAFT_PAST";
+  GAME_ENUM[GAME_ENUM["MAX_RADIUS"] = 30] = "MAX_RADIUS";
+  GAME_ENUM[GAME_ENUM["MIN_RADIUS"] = 10] = "MIN_RADIUS";
+})(GAME_ENUM || (GAME_ENUM = {}));
 
 /***/ })
 /******/ ]);
